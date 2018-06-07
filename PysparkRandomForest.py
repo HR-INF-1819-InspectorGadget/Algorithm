@@ -21,14 +21,14 @@ print("[v] -> PySpark")
 from pyspark.sql import SparkSession
 print("[v] -> PySpark SQL")
 SPARK_URL = "local[*]"
-spark = SparkSession.builder.appName("SimpleApp").master(SPARK_URL).getOrCreate()
+spark = SparkSession.builder.appName("Kapper").master(SPARK_URL).getOrCreate()
 sc = spark.sparkContext
 
 #Hier onze data importeren
 #collomen benoemd gebasseerd op query
-cols_select = ['itvOwnerId', 'itvInterventieOptieId', 'sjGender', 'sjDateOfBirth', 'sjMaritalStatusId', 'sjWoonplaatsId', 'lgscoreScore', 'itvGoalReached']
+cols_select = ['itvId','itvInterventieOptieId','itvRegieParentId','sjId','sjGender','sjDateOfBirth','sjMaritalStatusId','sjWoonplaatsId','casId','casClassification','casThemaGebiedId','lgscoreRegieParentId','lgscoreScore','probProbleemOptieId','itvGoalReached','itvGeresidiveerd']
 
-csvpath = "C:\InterventiecsvNONULL.csv"
+csvpath = "C:\FinalCSVnoNull.csv"
 df = spark.read.options(header = "true", inferschema = "true").csv(csvpath)
 print("[v] -> csv")
 
@@ -43,19 +43,15 @@ def calculate_age(born):
 
 calculate_age_udf = udf(calculate_age, IntegerType())
 df = df.withColumn("sjAge", calculate_age_udf(df.sjDateOfBirth.cast("string")))
-
-binary_to_bool_udf = udf(lambda x: 'reached' if x ==1  else 'notreached', StringType())
-df = df.withColumn("itvGoalReachedString", binary_to_bool_udf(df.itvGoalReached))
-
 print("[v] -> ageconvertion")
 
 #df.printSchema()
 
-from matplotlib import pyplot as plt
+#from matplotlib import pyplot as plt
 
-#print("Histograms below: ")
+#print("histograms below: ")
 
-#responses = df.groupBy('sjWoonplaatsId').count().collect() # list of Rows
+#responses = df.groupby('sjwoonplaatsid').count().collect() # list of rows
 #categories = [i[0] for i in responses]
 #counts = [i[1] for i in responses]
 
@@ -64,16 +60,16 @@ from matplotlib import pyplot as plt
 #plt.bar(ind, counts, width=width, color='r')
 
 #plt.ylabel('counts')
-#plt.title('Woonplaats distribution')
+#plt.title('woonplaats distribution')
 #plt.xticks(ind + width/2., categories)
 #plt.show()
 
 #onehot encoding zorgt ervoor dat dingen die niet int zijn worden omgezet naar getallen die onderscheiden kunnen worden
-cols_select = ['itvOwnerId', 'itvInterventieOptieId', 'sjGender', 'sjMaritalStatusId', 'sjWoonplaatsId', 'lgscoreScore', 'sjAge', 'itvGoalReachedString']
+cols_select = ['itvInterventieOptieId','itvRegieParentId','sjGender','sjMaritalStatusId','sjWoonplaatsId','casClassification','casThemaGebiedId','lgscoreRegieParentId','lgscoreScore','probProbleemOptieId','itvGoalReached','itvGeresidiveerd','sjAge']
 
-column_vec_in = ['itvOwnerId', 'itvInterventieOptieId', 'sjGender', 'sjMaritalStatusId', 'sjWoonplaatsId']
+column_vec_in = ['itvInterventieOptieId','itvRegieParentId','sjGender','sjMaritalStatusId','sjWoonplaatsId','casClassification','casThemaGebiedId','lgscoreRegieParentId','lgscoreScore','probProbleemOptieId']
 
-column_vec_out = ['itvOwnerIdvec', 'itvInterventieOptieIdvec', 'sjGendervec', 'sjMaritalStatusIdvec', 'sjWoonplaatsIdvec']
+column_vec_out = ['itvInterventieOptieIdvec','itvRegieParentIdvec','sjGendervec','sjMaritalStatusIdvec','sjWoonplaatsIdvec','casClassificationvec','casThemaGebiedIdvec','lgscoreRegieParentIdvec','lgscoreScorevec','probProbleemOptieIdvec']
  
 indexers = [StringIndexer(inputCol=x, outputCol=x+'_tmp') for x in column_vec_in ]
  
@@ -87,25 +83,25 @@ print("[v] -> onehotencoding")
 
 
 #finalize with pipeline
-cols_now = ['itvOwnerIdvec', 'itvInterventieOptieIdvec', 'sjGendervec', 'sjMaritalStatusIdvec', 'sjWoonplaatsIdvec', 'lgscoreScore', 'sjAge']
+cols_now = ['itvInterventieOptieIdvec','itvRegieParentIdvec','sjGendervec','sjMaritalStatusIdvec','sjWoonplaatsIdvec','casClassificationvec','casThemaGebiedIdvec','lgscoreRegieParentIdvec','lgscoreScorevec','probProbleemOptieIdvec','itvGoalReached','sjAge']
 
-assembler_features = VectorAssembler(inputCols=cols_now, outputCol='variables')
-labelIndexer = StringIndexer(inputCol='itvGoalReachedString', outputCol="resultintervention")
+assembler_features = VectorAssembler(inputCols=cols_now, outputCol='parameters')
+labelIndexer = StringIndexer(inputCol='itvGeresidiveerd', outputCol="resultintervention")
 tmp += [assembler_features, labelIndexer]
 pipeline = Pipeline(stages=tmp)
-print("adf")
 
 
 allData = pipeline.fit(df).transform(df)
 allData.show()
-allData = allData.select(allData['itvOwnerIdvec'], allData['itvInterventieOptieIdvec'], allData['sjGendervec'], allData['sjMaritalStatusIdvec'], allData['sjWoonplaatsIdvec'], allData['lgscoreScore'], allData['sjAge'], allData['itvGoalReachedString'], allData['variables'], allData["resultintervention"])
+allData = allData.select(allData['itvInterventieOptieIdvec'],allData['itvRegieParentIdvec'],allData['sjGendervec'],allData['sjMaritalStatusIdvec'],allData['sjWoonplaatsIdvec'],allData['casClassificationvec'],allData['casThemaGebiedIdvec'],allData['lgscoreRegieParentIdvec'],allData['lgscoreScorevec'],allData['probProbleemOptieIdvec'],allData['itvGoalReached'],allData['sjAge'],allData['parameters'], allData["resultintervention"])
 allData.show()
 print("[v] -> pipeline")
 allData.cache()
 print("[v] -> cashe")
-trainingData, testData = allData.randomSplit([0.8,0.2], seed=69) # need to ensure same split for each time
+trainingData, testData = allData.randomSplit([0.8,0.2], seed=42069) # need to ensure same split for each time
 print("traindata amount" + str(trainingData.count()))
 print("testdata amount" + str(testData.count()))
+print("Distribution of Pos and Neg in trainingData is: ", trainingData.groupBy("resultintervention").count().take(3))
 print("trainingdata")
 trainingData.describe().show()
 print("trainingdata2")
@@ -116,7 +112,7 @@ testData.show()
 print("alldata")
 allData.printSchema()
 
-rf = RF(labelCol='resultintervention', featuresCol='variables', numTrees=200)
+rf = RF(labelCol='resultintervention', featuresCol='parameters', numTrees=50)
 fit = rf.fit(trainingData)
 transformed = fit.transform(testData)
 
@@ -131,4 +127,5 @@ scoreAndLabels = sc.parallelize(results_list)
 
 print("metrics") 
 metrics = metric(scoreAndLabels)
-print("The ROC score is (@numTrees=200): ", metrics.areaUnderROC)
+print("The ROC score is (@numTrees=200):", metrics.areaUnderROC)
+
