@@ -109,4 +109,4 @@ def SuggestIntervention(subjectid):
     resultslist = results.toJSON()
     return resultslist
 
-SuggestIntervention("5")
+SuggestIntervention("6")
